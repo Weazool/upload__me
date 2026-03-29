@@ -140,7 +140,8 @@ async function main() {
 }
 
 const __filename = fileURLToPath(import.meta.url);
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === __filename;
+const arg = process.argv[1] ? path.resolve(process.argv[1]) : null;
+const isMain = arg === __filename || arg === path.dirname(__filename);
 if (isMain) {
   main().catch((err) => { console.error(err); process.exit(1); });
 }
