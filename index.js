@@ -5,6 +5,7 @@ import * as readline from 'node:readline';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { createApp } from './server.js';
 import { createMapping, removeMapping } from './upnp.js';
 import { printBanner, startCountdown, reviewFiles, printUploadProgress } from './console-ui.js';
@@ -117,7 +118,8 @@ async function main() {
   process.on('SIGTERM', () => shutdown('Terminated'));
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1'));
+const __filename = fileURLToPath(import.meta.url);
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === __filename;
 if (isMain) {
   main().catch((err) => { console.error(err); process.exit(1); });
 }
