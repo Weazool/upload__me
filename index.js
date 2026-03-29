@@ -57,6 +57,24 @@ function getLocalIp() {
   return '127.0.0.1';
 }
 
+async function getExternalIp() {
+  const services = [
+    'https://api.ipify.org',
+    'https://icanhazip.com',
+    'https://ifconfig.me/ip',
+  ];
+  for (const url of services) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const ip = (await res.text()).trim();
+        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) return ip;
+      }
+    } catch { /* try next */ }
+  }
+  return null;
+}
+
 async function main() {
   const targetFolder = await promptForFolder();
   const token = generateToken();
@@ -83,15 +101,18 @@ async function main() {
 
   const server = app.listen(port, async () => {
     const localUrl = `http://127.0.0.1:${port}/u/${token}`;
-    const lanUrl = `http://${getLocalIp()}:${port}/u/${token}`;
+    const lanIp = getLocalIp();
 
-    const upnpResult = await createMapping(port);
-    let networkUrl = null;
-    if (upnpResult.success) {
-      networkUrl = `http://${upnpResult.externalIp}:${port}/u/${token}`;
-    }
+    // Get external IP and attempt UPnP in parallel
+    const [externalIp, upnpResult] = await Promise.all([
+      getExternalIp(),
+      createMapping(port),
+    ]);
 
-    printBanner(localUrl, networkUrl || lanUrl, expiresAt);
+    const upnpOk = upnpResult.success;
+    const extIp = externalIp || (upnpResult.success ? upnpResult.externalIp : null);
+
+    printBanner(localUrl, lanIp, extIp, upnpOk, port, token, expiresAt);
     countdownInterval = startCountdown(expiresAt, () => shutdown('Session expired'));
     idleTimer = setTimeout(() => shutdown('Idle timeout reached'), 15 * 60 * 1000);
   });

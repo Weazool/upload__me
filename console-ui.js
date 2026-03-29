@@ -17,14 +17,19 @@ export function formatFileList(files) {
   });
 }
 
-export function printBanner(localUrl, networkUrl, expiresAt) {
+export function printBanner(localUrl, lanIp, extIp, upnpOk, port, token, expiresAt) {
   const divider = chalk.gray('\u2500'.repeat(50));
   console.log(divider);
   console.log(chalk.bold('  upload-me'));
   console.log(divider);
-  console.log(`  ${chalk.cyan('Local:')}   ${localUrl}`);
-  if (networkUrl) {
-    console.log(`  ${chalk.cyan('Network:')} ${networkUrl}`);
+  console.log(`  ${chalk.cyan('Local:')}    ${localUrl}`);
+  if (lanIp && lanIp !== '127.0.0.1') {
+    console.log(`  ${chalk.cyan('LAN:')}      http://${lanIp}:${port}/u/${token}`);
+  }
+  if (extIp) {
+    const label = upnpOk ? 'External:' : 'External:';
+    const note = upnpOk ? chalk.green(' (UPnP \u2714)') : chalk.yellow(' (UPnP \u2718 \u2014 manual port forward needed)');
+    console.log(`  ${chalk.cyan(label)} http://${extIp}:${port}/u/${token}${note}`);
   }
   console.log(divider);
 }
