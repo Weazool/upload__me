@@ -1,0 +1,26 @@
+{
+  "name": "upload-me",
+  "version": "1.0.0",
+  "description": "CLI-launched temporary file upload server",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node .",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "upload",
+    "file-sharing",
+    "cli"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@runonflux/nat-upnp": "^1.0.2",
+    "chalk": "^5.6.2",
+    "express": "^5.2.1",
+    "multer": "^2.1.1"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.2"
+  }
+}
