@@ -4,6 +4,7 @@
   "description": "CLI-launched temporary file upload server",
   "type": "module",
   "main": "index.js",
+  "bin": { "upload-me": "./index.js" },
   "scripts": {
     "start": "node .",
     "test": "vitest run"
