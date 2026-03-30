@@ -50,21 +50,6 @@ export function startCountdown(expiresAt, onExpire) {
   return interval;
 }
 
-function waitForKey(inputStream) {
-  return new Promise((resolve) => {
-    const useRaw = inputStream.isTTY && inputStream.setRawMode;
-    if (useRaw) inputStream.setRawMode(true);
-    inputStream.resume();
-    const onData = (key) => {
-      inputStream.removeListener('data', onData);
-      if (useRaw) inputStream.setRawMode(false);
-      inputStream.pause();
-      resolve(String.fromCharCode(key[0]).toLowerCase());
-    };
-    inputStream.on('data', onData);
-  });
-}
-
 export async function reviewFiles(files, onDecision, inputStream = process.stdin) {
   const divider = chalk.gray('\u2500'.repeat(50));
   console.log('\n' + divider);
@@ -72,6 +57,11 @@ export async function reviewFiles(files, onDecision, inputStream = process.stdin
   console.log(divider);
   formatFileList(files).forEach((line) => console.log(line));
   console.log('');
+
+  // Set up raw mode once for the entire review session
+  const useRaw = inputStream.isTTY && inputStream.setRawMode;
+  if (useRaw) inputStream.setRawMode(true);
+  inputStream.resume();
 
   const decisions = [];
   let acceptAll = false;
@@ -86,7 +76,13 @@ export async function reviewFiles(files, onDecision, inputStream = process.stdin
       process.stdout.write(
         `  ${chalk.bold('?')} Accept "${file.name}" (${formatFileSize(file.size)})? ${chalk.gray('(y/n/a)')} `
       );
-      const key = await waitForKey(inputStream);
+      const key = await new Promise((resolve) => {
+        const onData = (data) => {
+          inputStream.removeListener('data', onData);
+          resolve(String.fromCharCode(data[0]).toLowerCase());
+        };
+        inputStream.on('data', onData);
+      });
       if (key === 'a') {
         acceptAll = true;
         status = 'accepted';
@@ -103,6 +99,10 @@ export async function reviewFiles(files, onDecision, inputStream = process.stdin
     decisions.push({ name: file.name, size: file.size, status });
     onDecision({ name: file.name, status });
   }
+
+  // Clean up - leave stdin for the caller to manage
+  if (useRaw) inputStream.setRawMode(false);
+  inputStream.pause();
 
   return decisions;
 }

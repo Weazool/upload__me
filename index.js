@@ -143,12 +143,8 @@ async function main() {
     onFileReview: async (files, sendDecision) => {
       if (idleTimer) clearTimeout(idleTimer);
       if (countdownInterval) clearInterval(countdownInterval);
-      // Disable quit listener during review so stdin is free
-      if (quitListener) {
-        process.stdin.removeListener('data', quitListener);
-        if (process.stdin.isTTY) process.stdin.setRawMode(false);
-        process.stdin.pause();
-      }
+      // Remove quit listener so review gets the keypresses
+      if (quitListener) process.stdin.removeListener('data', quitListener);
       const decisions = await reviewFiles(files, sendDecision);
       // Re-enable quit listener
       if (quitListener && process.stdin.isTTY) {
