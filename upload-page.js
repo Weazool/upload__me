@@ -490,8 +490,14 @@ export function getUploadPageHtml({ token, expiresAt }) {
     };
 
     xhr.onload = function() {
-      // upload-complete SSE event will handle summary display
       files.forEach(function(f) { updateFileStatus(f.name, 'done'); });
+      try {
+        var body = JSON.parse(xhr.responseText);
+        showSummary(body.files || []);
+      } catch(e) {
+        showSummary(files.map(function(f) { return { name: f.name, status: 'uploaded' }; }));
+      }
+      if (sse) { sse.close(); sse = null; }
     };
 
     xhr.onerror = function() {
