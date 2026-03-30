@@ -134,6 +134,7 @@ async function main() {
 
   let idleTimer;
   let countdownInterval;
+  let quitListener;
 
   const app = createApp({
     token,
@@ -142,7 +143,19 @@ async function main() {
     onFileReview: async (files, sendDecision) => {
       if (idleTimer) clearTimeout(idleTimer);
       if (countdownInterval) clearInterval(countdownInterval);
+      // Disable quit listener during review so stdin is free
+      if (quitListener) {
+        process.stdin.removeListener('data', quitListener);
+        if (process.stdin.isTTY) process.stdin.setRawMode(false);
+        process.stdin.pause();
+      }
       const decisions = await reviewFiles(files, sendDecision);
+      // Re-enable quit listener
+      if (quitListener && process.stdin.isTTY) {
+        process.stdin.setRawMode(true);
+        process.stdin.resume();
+        process.stdin.on('data', quitListener);
+      }
       return decisions;
     },
     onUploadProgress: (filename, percent) => {
@@ -178,13 +191,14 @@ async function main() {
 
     // Listen for 'q' or Escape to quit
     if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-      process.stdin.resume();
-      process.stdin.on('data', (key) => {
+      quitListener = (key) => {
         if (key[0] === 0x71 || key[0] === 0x51 || key[0] === 0x1b) { // q, Q, Escape
           shutdown('User quit');
         }
-      });
+      };
+      process.stdin.setRawMode(true);
+      process.stdin.resume();
+      process.stdin.on('data', quitListener);
     }
     console.log(chalk.gray('  Press Q or Esc to quit'));
   });

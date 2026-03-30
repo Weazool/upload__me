@@ -50,10 +50,22 @@ export function startCountdown(expiresAt, onExpire) {
   return interval;
 }
 
-export async function reviewFiles(files, onDecision, inputStream = process.stdin) {
-  const rl = readline.createInterface({ input: inputStream, output: process.stdout });
-  const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
+function waitForKey(inputStream) {
+  return new Promise((resolve) => {
+    const useRaw = inputStream.isTTY && inputStream.setRawMode;
+    if (useRaw) inputStream.setRawMode(true);
+    inputStream.resume();
+    const onData = (key) => {
+      inputStream.removeListener('data', onData);
+      if (useRaw) inputStream.setRawMode(false);
+      inputStream.pause();
+      resolve(String.fromCharCode(key[0]).toLowerCase());
+    };
+    inputStream.on('data', onData);
+  });
+}
 
+export async function reviewFiles(files, onDecision, inputStream = process.stdin) {
   const divider = chalk.gray('\u2500'.repeat(50));
   console.log('\n' + divider);
   console.log(chalk.bold(`  ${files.length} file(s) submitted for review:`));
@@ -71,25 +83,27 @@ export async function reviewFiles(files, onDecision, inputStream = process.stdin
       status = 'accepted';
       console.log(chalk.green(`  \u2714 "${file.name}" auto-accepted`));
     } else {
-      const answer = await ask(
+      process.stdout.write(
         `  ${chalk.bold('?')} Accept "${file.name}" (${formatFileSize(file.size)})? ${chalk.gray('(y/n/a)')} `
       );
-      const choice = answer.trim().toLowerCase();
-      if (choice === 'a') {
+      const key = await waitForKey(inputStream);
+      if (key === 'a') {
         acceptAll = true;
         status = 'accepted';
+        console.log(chalk.green('a'));
         console.log(chalk.green(`  \u2714 Accepting all remaining files`));
-      } else if (choice === 'y') {
+      } else if (key === 'y') {
         status = 'accepted';
+        console.log(chalk.green('y'));
       } else {
         status = 'rejected';
+        console.log(chalk.red('n'));
       }
     }
     decisions.push({ name: file.name, size: file.size, status });
     onDecision({ name: file.name, status });
   }
 
-  rl.close();
   return decisions;
 }
 
