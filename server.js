@@ -5,7 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { getUploadPageHtml } from './upload-page.js';
 
-export function createApp({ token, targetFolder, onFileReview, onUploadProgress, expiresAt }) {
+export function createApp({ token, targetFolder, onFileReview, onUploadProgress, onUploadComplete, expiresAt }) {
   const app = express();
   app.use(express.json());
 
@@ -108,9 +108,11 @@ export function createApp({ token, targetFolder, onFileReview, onUploadProgress,
       );
       results.push({ name: finalName, status: 'uploaded' });
       broadcast({ type: 'upload-progress', filename: originalName, percent: 100 });
+      if (onUploadProgress) onUploadProgress(originalName, 100);
     }
 
     broadcast({ type: 'upload-complete', files: results });
+    if (onUploadComplete) onUploadComplete(results);
     res.json({ files: results });
   });
 

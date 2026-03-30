@@ -177,6 +177,8 @@ export function getUploadPageHtml({ token, expiresAt }) {
   .badge-reviewing { background: #fff3cd; color: #856404; }
   .badge-accepted  { background: #d4edda; color: #155724; }
   .badge-rejected  { background: #f8d7da; color: #721c24; }
+  .badge-uploading { background: #cce5ff; color: #004085; }
+  .badge-done      { background: #d4edda; color: #155724; }
   .progress-wrap {
     width: 100%;
     height: 4px;
@@ -442,7 +444,6 @@ export function getUploadPageHtml({ token, expiresAt }) {
     if (status === 'accepted') {
       badge.classList.add('badge-accepted');
       badge.textContent = 'Accepted';
-      // Add progress bar for accepted files
       if (!item.querySelector('.progress-wrap')) {
         var pw = document.createElement('div');
         pw.className = 'progress-wrap';
@@ -452,6 +453,12 @@ export function getUploadPageHtml({ token, expiresAt }) {
     } else if (status === 'rejected') {
       badge.classList.add('badge-rejected');
       badge.textContent = 'Rejected';
+    } else if (status === 'uploading') {
+      badge.classList.add('badge-uploading');
+      badge.textContent = 'Uploading...';
+    } else if (status === 'done') {
+      badge.classList.add('badge-done');
+      badge.textContent = 'Done';
     } else {
       badge.classList.add('badge-reviewing');
       badge.textContent = 'Reviewing';
@@ -463,10 +470,12 @@ export function getUploadPageHtml({ token, expiresAt }) {
     var files = filesToUpload.filter(function(f) { return acceptedNames.indexOf(f.name) !== -1; });
 
     if (files.length === 0) {
-      // Nothing to upload — show summary with zeroes
       showSummary([]);
       return;
     }
+
+    // Update badges to "Uploading"
+    files.forEach(function(f) { updateFileStatus(f.name, 'uploading'); });
 
     var formData = new FormData();
     files.forEach(function(f) { formData.append('files', f, f.name); });
@@ -482,6 +491,7 @@ export function getUploadPageHtml({ token, expiresAt }) {
 
     xhr.onload = function() {
       // upload-complete SSE event will handle summary display
+      files.forEach(function(f) { updateFileStatus(f.name, 'done'); });
     };
 
     xhr.onerror = function() {

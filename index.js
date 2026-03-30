@@ -152,10 +152,25 @@ async function main() {
         process.stdin.resume();
         process.stdin.on('data', quitListener);
       }
+      const accepted = decisions.filter(d => d.status === 'accepted').length;
+      const rejected = decisions.filter(d => d.status === 'rejected').length;
+      console.log('');
+      console.log(chalk.bold(`  Review complete: ${chalk.green(accepted + ' accepted')}, ${chalk.red(rejected + ' rejected')}`));
+      if (accepted > 0) {
+        console.log(chalk.cyan('  Waiting for upload...'));
+      } else {
+        shutdown('No files accepted');
+      }
       return decisions;
     },
-    onUploadProgress: (filename, percent) => {
-      printUploadProgress(filename, percent);
+    onUploadComplete: (results) => {
+      const uploaded = results.filter(r => r.status === 'uploaded');
+      console.log('');
+      console.log(chalk.green.bold(`  \u2714 ${uploaded.length} file(s) uploaded to ${targetFolder}`));
+      for (const r of uploaded) {
+        console.log(chalk.green(`    \u2022 ${r.name}`));
+      }
+      setTimeout(() => shutdown('Upload complete'), 1000);
     },
   });
 
