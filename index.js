@@ -175,6 +175,8 @@ async function main() {
   });
 
   const server = app.listen(port, async () => {
+    server.timeout = 0;
+    server.keepAliveTimeout = 0;
     const localUrl = `http://127.0.0.1:${port}/u/${token}`;
     const lanIp = getLocalIp();
 

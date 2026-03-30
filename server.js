@@ -87,6 +87,10 @@ export function createApp({ token, targetFolder, onFileReview, onUploadProgress,
   const upload = multer({ storage });
 
   app.post('/u/:token/upload', upload.any(), async (req, res) => {
+    // Disable timeouts so large files don't get killed
+    req.socket.setTimeout(0);
+    req.socket.setNoDelay(true);
+    req.socket.setKeepAlive(true);
     if (!reviewComplete) {
       return res.status(400).json({ error: 'Review not completed yet' });
     }
@@ -96,7 +100,7 @@ export function createApp({ token, targetFolder, onFileReview, onUploadProgress,
       const originalName = path.basename(req._fileMap?.get(file.filename) || file.originalname);
 
       if (!acceptedFiles.has(originalName)) {
-        fs.unlinkSync(path.join(targetFolder, file.filename));
+        try { fs.unlinkSync(path.join(targetFolder, file.filename)); } catch { /* already gone */ }
         results.push({ name: originalName, status: 'rejected' });
         continue;
       }
@@ -114,6 +118,15 @@ export function createApp({ token, targetFolder, onFileReview, onUploadProgress,
     broadcast({ type: 'upload-complete', files: results });
     if (onUploadComplete) onUploadComplete(results);
     res.json({ files: results });
+  });
+
+  // Handle multer errors (e.g. aborted uploads) gracefully
+  app.use((err, req, res, next) => {
+    if (err.code === 'ECONNABORTED' || err.message === 'Request aborted') {
+      console.error('Upload connection lost');
+      return res.status(499).end();
+    }
+    next(err);
   });
 
   app._broadcast = broadcast;
