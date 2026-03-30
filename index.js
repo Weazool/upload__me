@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
 import * as readline from 'node:readline';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import chalk from 'chalk';
 import { createApp } from './server.js';
 import { createMapping, removeMapping } from './upnp.js';
 import { printBanner, startCountdown, reviewFiles, printUploadProgress } from './console-ui.js';
@@ -31,6 +33,15 @@ export function validateFolder(folderPath) {
 }
 
 async function promptForFolder() {
+  if (process.platform === 'win32') {
+    console.log(chalk.gray('  Opening folder picker...'));
+    try {
+      return await selectFolderDialog();
+    } catch {
+      console.log(chalk.yellow('  Folder picker cancelled.'));
+      process.exit(0);
+    }
+  }
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
     rl.question('Target folder path: ', (answer) => {
@@ -42,6 +53,46 @@ async function promptForFolder() {
       }
       resolve(result.folder);
     });
+  });
+}
+
+function selectFolderDialog() {
+  return new Promise((resolve, reject) => {
+    const psScript = `
+      Add-Type -AssemblyName System.Windows.Forms
+      $d = New-Object System.Windows.Forms.FolderBrowserDialog
+      $d.Description = "Select target folder for uploads"
+      $d.ShowNewFolderButton = $true
+      if ($d.ShowDialog() -eq "OK") { Write-Output $d.SelectedPath }
+      else { exit 1 }
+    `;
+    const ps = spawn('powershell.exe', ['-NoProfile', '-Command', psScript], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let output = '';
+    ps.stdout.on('data', (d) => { output += d.toString(); });
+    ps.on('close', (code) => {
+      const folder = output.trim();
+      if (code === 0 && folder) {
+        const result = validateFolder(folder);
+        if (!result.valid) { reject(new Error(result.error)); return; }
+        resolve(result.folder);
+      } else {
+        reject(new Error('Cancelled'));
+      }
+    });
+    ps.on('error', reject);
+  });
+}
+
+function copyToClipboard(text) {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') { resolve(false); return; }
+    const proc = spawn('clip', { stdio: ['pipe', 'ignore', 'ignore'] });
+    proc.stdin.write(text);
+    proc.stdin.end();
+    proc.on('close', () => resolve(true));
+    proc.on('error', () => resolve(false));
   });
 }
 
@@ -113,6 +164,15 @@ async function main() {
     const extIp = externalIp || (upnpResult.success ? upnpResult.externalIp : null);
 
     printBanner(localUrl, lanIp, extIp, upnpOk, port, token, expiresAt);
+
+    const shareUrl = extIp
+      ? `http://${extIp}:${port}/u/${token}`
+      : lanIp !== '127.0.0.1'
+        ? `http://${lanIp}:${port}/u/${token}`
+        : localUrl;
+    const copied = await copyToClipboard(shareUrl);
+    if (copied) console.log(chalk.green('  \u2714 URL copied to clipboard'));
+
     countdownInterval = startCountdown(expiresAt, () => shutdown('Session expired'));
     idleTimer = setTimeout(() => shutdown('Idle timeout reached'), 15 * 60 * 1000);
   });
