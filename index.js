@@ -175,6 +175,18 @@ async function main() {
 
     countdownInterval = startCountdown(expiresAt, () => shutdown('Session expired'));
     idleTimer = setTimeout(() => shutdown('Idle timeout reached'), 15 * 60 * 1000);
+
+    // Listen for 'q' or Escape to quit
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(true);
+      process.stdin.resume();
+      process.stdin.on('data', (key) => {
+        if (key[0] === 0x71 || key[0] === 0x51 || key[0] === 0x1b) { // q, Q, Escape
+          shutdown('User quit');
+        }
+      });
+    }
+    console.log(chalk.gray('  Press Q or Esc to quit'));
   });
 
   async function shutdown(reason) {
